@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}Workspace Agent · AI Workbench{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="/static/css/main.css" rel="stylesheet" />
+</head>
+<body class="page">
+  <header class="navbar">
+    <div class="navbar-left">
+      <div class="brand">AI Workbench</div>
+      <nav class="nav-links">
+        <a href="/" class="nav-link">Workspace Agent</a>
+      </nav>
+    </div>
+    <div class="navbar-right">
+      <span class="pill pill-muted">Study RAG · Lab Copilot · Ollama · CPU/GPU Host</span>
+    </div>
+  </header>
+
+  <main class="page-main">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+requests
+jinja2
+python-multipart
+markdown
+weasyprint
+pango
+

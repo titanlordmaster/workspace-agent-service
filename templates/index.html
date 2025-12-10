@@ -1,0 +1,211 @@
+{# templates/index.html #}
+{% extends "base.html" %}
+
+{% block title %}Workspace Agent · AI Workbench{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Workspace Agent</h1>
+<p class="page-subtitle">
+  Hub service that coordinates Study RAG, Lab Copilot, and higher-level agent logic.
+</p>
+
+<div class="card">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Ask Workspace Agent</div>
+      <div class="card-subtitle">
+        Choose a mode: raw RAG, Copilot over RAG, manager auto-cycle, or study-guide LLM.
+      </div>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <!-- Left: form -->
+    <div>
+      {% set current_mode = (state.mode if state is defined and state.mode else "copilot") %}
+
+      <form method="post" action="/workspace/query" class="form">
+        <div class="field">
+          <label for="ws_question">Question</label>
+          <textarea id="ws_question"
+                    name="question"
+                    rows="4"
+                    placeholder="e.g. What is MCP?  or  Build me a study guide for MCP.">{{ state.question or "" }}</textarea>
+        </div>
+
+        <div class="field field-inline">
+          <label for="ws_top_k">Top-K chunks</label>
+          <input id="ws_top_k"
+                 name="top_k"
+                 type="number"
+                 min="1"
+                 max="20"
+                 value="{{ state.top_k or 8 }}" />
+        </div>
+
+        <hr class="divider" />
+
+        <div class="field">
+          <span>Mode</span>
+          <select name="mode">
+            <option value="rag_only"
+                    {% if current_mode == "rag_only" %}selected{% endif %}>
+              RAG only – show chunks & optional summary
+            </option>
+            <option value="copilot"
+                    {% if current_mode == "copilot" %}selected{% endif %}>
+              Copilot – RAG visual + Lab Copilot answer
+            </option>
+            <option value="manager_auto"
+                    {% if current_mode == "manager_auto" %}selected{% endif %}>
+              Manager auto – agent chooses tools (up to 4 calls)
+            </option>
+            <option value="study_guide"
+                    {% if current_mode == "study_guide" %}selected{% endif %}>
+              Study guide – structured plan from RAG context
+            </option>
+          </select>
+          <p class="muted">
+            "Manager auto" treats RAG and Copilot as tools; "Study guide" turns
+            the context into a markdown learning plan.
+          </p>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.8rem;">
+          <button type="submit" class="btn primary">
+            Run query
+          </button>
+          <span class="muted">
+            Mode: {{ current_mode }}
+          </span>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right: answer + trace -->
+    <div>
+      <div class="section-title">Answer</div>
+      {% if state.answer %}
+        <pre class="answer-block">{{ state.answer }}</pre>
+      {% else %}
+        <p class="muted">
+          Submit a question on the left to see the answer here.
+        </p>
+      {% endif %}
+
+      {% if state.agent_trace and state.mode == "manager_auto" %}
+        <div class="section" style="margin-top:0.8rem;">
+          <div class="section-title">Manager trace</div>
+          <p class="muted" style="margin-bottom:0.35rem;">
+            Internal tool calls (RAG / Copilot) executed before the final answer.
+          </p>
+          <div style="max-height:160px; overflow:auto; font-size:0.8rem;">
+            {% for step in state.agent_trace %}
+              <div style="border-bottom:1px solid #111827; padding:0.3rem 0;">
+                <div class="muted">
+                  Step {{ step.step }} · {{ step.tool }}
+                </div>
+                <div>{{ step.summary }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      {% if state.mode == "study_guide" and (state.markdown_url or state.pdf_url) %}
+        <div class="section" style="margin-top:0.6rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+          {% if state.markdown_url %}
+            <a href="{{ state.markdown_url }}" class="btn" download>
+              Download markdown
+            </a>
+          {% endif %}
+          {% if state.pdf_url %}
+            <a href="{{ state.pdf_url }}" class="btn" download>
+              Download PDF
+            </a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Bottom card: context visualisation -->
+<div class="card" style="margin-top:1.25rem;">
+  <div class="card-header">
+    <div>
+      <div class="card-title">Retrieved context</div>
+      <div class="card-subtitle">
+        What the tools actually saw and used while answering.
+      </div>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <!-- Left: RAG -->
+    <div>
+      <div class="section-title">Study RAG</div>
+      {% if state.rag and state.rag.chunks %}
+        <p class="muted" style="margin-bottom:0.4rem;">
+          Top-{{ state.top_k or state.rag.chunks|length }} chunks from your library.
+        </p>
+        <div class="chunks">
+          {% for ch in state.rag.chunks %}
+            <div class="chunk">
+              <div class="chunk-meta">
+                <span class="pill">{{ ch.source or "chunk" }}</span>
+                {% if ch.page is not none %}
+                  <span class="pill">page {{ ch.page }}</span>
+                {% endif %}
+                {% if ch.chunk_id is not none %}
+                  <span class="pill">#{{ ch.chunk_id }}</span>
+                {% endif %}
+              </div>
+              <p class="chunk-text">
+                {% set text = ch.text or "" %}
+                {{ text[:500] }}{% if text|length > 500 %}…{% endif %}
+              </p>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">
+          No Study RAG chunks available for this query (either RAG not called, or nothing matched).
+        </p>
+      {% endif %}
+    </div>
+
+    <!-- Right: Copilot context -->
+    <div>
+      <div class="section-title">Lab Copilot</div>
+      {% if state.copilot and state.copilot.chunks %}
+        <p class="muted" style="margin-bottom:0.4rem;">
+          Chunks Lab Copilot saw when generating its answer.
+        </p>
+        <div class="chunks">
+          {% for ch in state.copilot.chunks %}
+            <div class="chunk">
+              <div class="chunk-meta">
+                <span class="pill">
+                  {{ ch.source
+                     or (ch.metadata.source if ch.metadata is defined else None)
+                     or (ch.metadata.file_name if ch.metadata is defined else None)
+                     or "chunk" }}
+                </span>
+              </div>
+              <p class="chunk-text">
+                {% set text = ch.content or ch.page_content or "" %}
+                {{ text[:500] }}{% if text|length > 500 %}…{% endif %}
+              </p>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="muted">
+          No Copilot context for this query (either Copilot not called, or it returned no chunks).
+        </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

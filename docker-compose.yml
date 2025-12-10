@@ -1,0 +1,19 @@
+services:
+  workspace-agent:
+    build: .
+    container_name: workspace-agent-service
+    ports:
+      - "8082:8082"
+    environment:
+      # Ollama is running on the HOST at port 11434
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+
+      # If Study RAG is running on the host at 8080, wire it too:
+      - STUDY_RAG_BASE_URL=http://host.docker.internal:8080
+
+      - LAB_COPILOT_BASE_URL=http://host.docker.internal:8081
+
+    volumes:
+      - ./data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
